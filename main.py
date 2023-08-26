@@ -74,10 +74,10 @@ def add_background(image, bgcolor):
 
 def add_noise(image, max_amount):
 
-    ''' max_amount is between 0 and 100 percent '''
+    ''' max_amount is between 0 and 100 percent. Noise might not be visible'''
 
     # Normalize max_amount to range from 0 to 0.1
-    max_amount /= 2000
+    max_amount /= 10000
 
     # Normalize the image to [0, 1]
     image_normalized = image / 255.0
@@ -126,15 +126,15 @@ if __name__ == "__main__":
 
     # Specify the input image path
     input_image_path = os.path.join(input_directory, first_image)
-    scale_factor = 4
+    scale_factor = 2
     input_image = cv2.imread(input_image_path, cv2.IMREAD_UNCHANGED)
     upscaled_image = upscale_nearest(input_image, scale_factor)
-    canvas_scaled_image = increase_canvas(upscaled_image, (175, 175), 3)
+    canvas_scaled_image = increase_canvas(upscaled_image, (128, 128), 2)
 
     red_filled_image = add_background(canvas_scaled_image, random_color())
-    red_filled_image_bicubic = add_jpeg_artifacts(upscale_bicubic(red_filled_image, 2), 20)
-    red_filled_image_noise = add_noise(red_filled_image_bicubic, 25)
-    red_filled_image_noise_jpeg = add_noise(red_filled_image_noise, 40)
+    red_filled_image_bicubic = upscale_bicubic(red_filled_image, scale_factor)
+    red_filled_image_noise = add_noise(red_filled_image_bicubic, 40)
+    red_filled_image_noise_jpeg = add_jpeg_artifacts(red_filled_image_noise, 40)
 
     output_directory = "./output"
     output_filename = rewrite_filename_with_string(first_image, "canvas_scaled_red_filled")
