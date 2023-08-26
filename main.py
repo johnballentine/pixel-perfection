@@ -32,23 +32,33 @@ def upscale_integer(image, scale_factor):
     return resized_img_with_alpha
 
 
-def increase_canvas(image, scale_factor, canvas_color=(0, 0, 0, 0)):
-    # Calculate the new width and height based on the scale factor
-    new_width = int(image.shape[1] * scale_factor)
-    new_height = int(image.shape[0] * scale_factor)
+def increase_canvas(image, new_dimensions):
+    new_width, new_height = new_dimensions
 
     # Create a larger canvas
     enlarged_image = np.zeros((new_height, new_width, 4), dtype=np.uint8)
     enlarged_image[:, :, 3] = 0  # Set the alpha channel to 0 (transparent)
 
     # Calculate the position to paste the original image
-    paste_x = int((new_width - image.shape[1]) / 2)
-    paste_y = int((new_height - image.shape[0]) / 2)
+    paste_x = max(0, (new_width - image.shape[1]) // 2)
+    paste_y = max(0, (new_height - image.shape[0]) // 2)
+
+    # Calculate the position to paste the original image if new dimensions are odd
+    paste_x_odd = max(0, (new_width - image.shape[1] + 1) // 2)
+    paste_y_odd = max(0, (new_height - image.shape[0] + 1) // 2)
+
+    # Adjust the paste position for odd dimensions
+    if new_width % 2 != 0:
+        paste_x = paste_x_odd
+    if new_height % 2 != 0:
+        paste_y = paste_y_odd
 
     # Paste the original image onto the larger canvas
     enlarged_image[paste_y:paste_y + image.shape[0], paste_x:paste_x + image.shape[1], :] = image
 
     return enlarged_image
+
+
 
 
 if __name__ == "__main__":
@@ -90,7 +100,7 @@ if __name__ == "__main__":
         cv2.imwrite(output_path, upscaled_image)
 
         # Test the increase_canvas function
-        canvas_scaled_image = increase_canvas(upscaled_image, 1.5, canvas_color=(255, 0, 0, 255))
+        canvas_scaled_image = increase_canvas(upscaled_image, (129, 129))
         canvas_output_filename = rewrite_filename_with_string(first_image, "canvas_scaled")
         canvas_output_path = os.path.join(output_directory, canvas_output_filename)
         cv2.imwrite(canvas_output_path, canvas_scaled_image)
