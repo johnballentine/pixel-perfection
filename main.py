@@ -5,105 +5,69 @@ import numpy as np
 def rewrite_filename_with_string(filename, extra_string):
     # Split the filename into base and extension
     base, extension = os.path.splitext(filename)
-    
+
     # Create the new filename with the added string and extension
     new_filename = f"{base}_{extra_string}{extension}"
-    
+
     return new_filename
 
-
 def upscale_integer(image, scale_factor):
-    # Get the alpha channel
-    alpha = image[:, :, 3]
+    # Upscale the image using INTER_NEAREST interpolation
+    rescaled_image = cv2.resize(image, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_NEAREST)
 
-    # Calculate the new width and height based on the scale factor
-    new_width = int(image.shape[1] * scale_factor)
-    new_height = int(image.shape[0] * scale_factor)
-
-    # Resize the image and the alpha channel using nearest-neighbor interpolation
-    resized_img = cv2.resize(image[:, :, :3], (new_width, new_height), interpolation=cv2.INTER_NEAREST)
-    resized_alpha = cv2.resize(alpha, (new_width, new_height), interpolation=cv2.INTER_NEAREST)
-
-    # Create the resized image with the merged alpha channel
-    resized_img_with_alpha = np.zeros((new_height, new_width, 4), dtype=np.uint8)
-    resized_img_with_alpha[:, :, :3] = resized_img
-    resized_img_with_alpha[:, :, 3] = resized_alpha
-
-    return resized_img_with_alpha
-
+    return rescaled_image
 
 def increase_canvas(image, new_dimensions):
-    new_width, new_height = new_dimensions
-
-    # Create a larger canvas
-    enlarged_image = np.zeros((new_height, new_width, 4), dtype=np.uint8)
-    enlarged_image[:, :, 3] = 0  # Set the alpha channel to 0 (transparent)
-
-    # Calculate the position to paste the original image
-    paste_x = max(0, (new_width - image.shape[1]) // 2)
-    paste_y = max(0, (new_height - image.shape[0]) // 2)
-
-    # Calculate the position to paste the original image if new dimensions are odd
-    paste_x_odd = max(0, (new_width - image.shape[1] + 1) // 2)
-    paste_y_odd = max(0, (new_height - image.shape[0] + 1) // 2)
-
-    # Adjust the paste position for odd dimensions
-    if new_width % 2 != 0:
-        paste_x = paste_x_odd
-    if new_height % 2 != 0:
-        paste_y = paste_y_odd
-
-    # Paste the original image onto the larger canvas
-    enlarged_image[paste_y:paste_y + image.shape[0], paste_x:paste_x + image.shape[1], :] = image
+    enlarged_image = np.zeros((*new_dimensions, 4), dtype=np.uint8)
+    
+    yoff = (new_dimensions[0]-image.shape[0])//2
+    xoff = (new_dimensions[1]-image.shape[1])//2
+    enlarged_image[yoff:yoff+image.shape[0], xoff:xoff+image.shape[1]] = image
 
     return enlarged_image
 
+def fill_transparency(image, color):
+    # Split the image into BGRA channels
+    B,G,R,A = cv2.split(image)
 
+    # Create a 3-channel color image (RGB)
+    fill_color_img = np.zeros([image.shape[0], image.shape[1], 3]).astype('uint8')
+    fill_color_img[:,:] = color
+  
+    # Calculate the weighting of each pixel based on transparency
+    A = A / 255.0
+    fill_weight = 1 - A
+    image_weight = A
 
+    # Split fill color into channels
+    fill_B, fill_G, fill_R = cv2.split(fill_color_img)
+    blend_B = (B * image_weight + fill_B * fill_weight).astype(np.uint8)
+    blend_G = (G * image_weight + fill_G * fill_weight).astype(np.uint8)
+    blend_R = (R * image_weight + fill_R * fill_weight).astype(np.uint8)
+
+    # Merge channels into final image but only keep BGR channels
+    return cv2.merge([blend_B, blend_G, blend_R])
 
 if __name__ == "__main__":
-    # Specify the input directory containing images
     input_directory = "data"
-
-    # Get a list of all files in the input directory
     files_in_directory = os.listdir(input_directory)
+    first_image = [file for file in files_in_directory if file.lower().endswith(('.png', '.jpg', '.jpeg'))][0]
 
-    # Find the first image in the list
-    first_image = None
-    for file in files_in_directory:
-        if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-            first_image = file
-            break
+    # Specify the input image path
+    input_image_path = os.path.join(input_directory, first_image)
+    scale_factor = 2
+    input_image = cv2.imread(input_image_path, cv2.IMREAD_UNCHANGED)
+    upscaled_image = upscale_integer(input_image, scale_factor)
+    canvas_scaled_image = increase_canvas(upscaled_image, (129, 129))
+    #print("canvas_scaled_image shape:", canvas_scaled_image.shape)
 
-    if first_image is not None:
-        # Specify the input image path
-        input_image_path = os.path.join(input_directory, first_image)
+    red_filled_image = fill_transparency(canvas_scaled_image, (0,0,255))  # Red color
 
-        # Set the scaling factor
-        scale_factor = 2
+    output_directory = "./output"
+    output_filename = rewrite_filename_with_string(first_image, "canvas_scaled_red_filled")
 
-        # Load the input image
-        input_image = cv2.imread(input_image_path, cv2.IMREAD_UNCHANGED)
+    # Create the output directory if it doesn't exist
+    os.makedirs(output_directory, exist_ok=True)
 
-        # Upscale the image using upscale_integer function
-        upscaled_image = upscale_integer(input_image, scale_factor)
-
-        # Specify the output directory and new filename
-        output_directory = "output"
-        output_filename = rewrite_filename_with_string(first_image, "canvas")
-
-        # Create the output directory if it doesn't exist
-        os.makedirs(output_directory, exist_ok=True)
-
-        # Save the upscaled image with the specified filename and path
-        output_path = os.path.join(output_directory, output_filename)
-        cv2.imwrite(output_path, upscaled_image)
-
-        # Test the increase_canvas function
-        canvas_scaled_image = increase_canvas(upscaled_image, (129, 129))
-        canvas_output_filename = rewrite_filename_with_string(first_image, "canvas_scaled")
-        canvas_output_path = os.path.join(output_directory, canvas_output_filename)
-        cv2.imwrite(canvas_output_path, canvas_scaled_image)
-
-    else:
-        print("No image files found in the input directory.")
+    output_path = os.path.join(output_directory, output_filename)
+    cv2.imwrite(output_path, red_filled_image)
