@@ -1,6 +1,7 @@
 import cv2
 import os
 import numpy as np
+import random
 
 def rewrite_filename_with_string(filename, extra_string):
     # Split the filename into base and extension
@@ -17,11 +18,17 @@ def upscale_integer(image, scale_factor):
 
     return rescaled_image
 
-def increase_canvas(image, new_dimensions):
+def increase_canvas(image, new_dimensions, max_random_offset=0):
     enlarged_image = np.zeros((*new_dimensions, 4), dtype=np.uint8)
     
-    yoff = (new_dimensions[0]-image.shape[0])//2
-    xoff = (new_dimensions[1]-image.shape[1])//2
+    yoff = (new_dimensions[0] - image.shape[0]) // 2
+    xoff = (new_dimensions[1] - image.shape[1]) // 2
+    if max_random_offset > 0:
+        random_yoff = int(random.gauss(0, max_random_offset / 2))  
+        random_xoff = int(random.gauss(0, max_random_offset / 2))
+        yoff += random_yoff
+        xoff += random_xoff
+
     enlarged_image[yoff:yoff+image.shape[0], xoff:xoff+image.shape[1]] = image
 
     return enlarged_image
@@ -64,7 +71,7 @@ if __name__ == "__main__":
     scale_factor = 2
     input_image = cv2.imread(input_image_path, cv2.IMREAD_UNCHANGED)
     upscaled_image = upscale_integer(input_image, scale_factor)
-    canvas_scaled_image = increase_canvas(upscaled_image, (129, 129))
+    canvas_scaled_image = increase_canvas(upscaled_image, (129, 129), 5)
     #print("canvas_scaled_image shape:", canvas_scaled_image.shape)
 
     red_filled_image = add_background(canvas_scaled_image, (0,0,255))  # Red color
