@@ -119,12 +119,17 @@ def random_color(saturation=30):
     return bgr_color[0][0]
 
 
-def generate(image, scale_factor=2, max_random_offset=2, max_noise=40, jpeg_quality=40):
+def generate(image,
+             image_size=(128,128),
+             scale_factor=2,
+             max_random_offset=2,
+             max_noise=40,
+             jpeg_quality=40):
     # Upscale the image using nearest neighbor interpolation
     upscaled_image = upscale_nearest(image, scale_factor)
 
     # Increase the canvas size with specified offset
-    canvas_scaled_image = increase_canvas(upscaled_image, (128, 128), max_random_offset)
+    canvas_scaled_image = increase_canvas(upscaled_image, image_size, max_random_offset)
 
     # Fill transparency (if any) with a random color
     color_filled_image = add_background(canvas_scaled_image, random_color())
@@ -143,20 +148,32 @@ def generate(image, scale_factor=2, max_random_offset=2, max_noise=40, jpeg_qual
 
 if __name__ == "__main__":
     input_directory = "data"
-    files_in_directory = os.listdir(input_directory)
-    first_image = [file for file in files_in_directory if file.lower().endswith(('.png', '.jpg', '.jpeg'))][0]
-
-    # Specify the input image path
-    input_image_path = os.path.join(input_directory, first_image)
-    input_image = cv2.imread(input_image_path, cv2.IMREAD_UNCHANGED)
-    
-    output_image = generate(input_image)
-
     output_directory = "./output"
-    output_filename = rewrite_filename_with_string(first_image, "canvas_scaled_red_filled")
+    files_in_directory = os.listdir(input_directory)
+
+    image_size = (256, 256)
 
     # Create the output directory if it doesn't exist
     os.makedirs(output_directory, exist_ok=True)
 
-    output_path = os.path.join(output_directory, output_filename)
-    cv2.imwrite(output_path, output_image)
+    for filename in files_in_directory:
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            # Specify the input image path
+            input_image_path = os.path.join(input_directory, filename)
+
+            # Read the input image
+            input_image = cv2.imread(input_image_path, cv2.IMREAD_UNCHANGED)
+
+            # Increase the canvas size of the original image with 0 offset
+            input_image_canvas = increase_canvas(input_image, image_size, 0)
+
+            # Write the original image with increased canvas size to the output directory with filename modified to include "_label"
+            label_filename = rewrite_filename_with_string(filename, "label")
+            cv2.imwrite(os.path.join(output_directory, label_filename), input_image_canvas)
+
+            # Process the input image
+            output_image = generate(input_image)
+
+            # Write the output image to the output directory with filename modified to include "_processed"
+            processed_filename = rewrite_filename_with_string(filename, "processed")
+            cv2.imwrite(os.path.join(output_directory, processed_filename), output_image)
