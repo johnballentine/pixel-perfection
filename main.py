@@ -141,7 +141,11 @@ def generate(image,
     noisy_image = add_noise(color_filled_image_bicubic, max_noise)
 
     # Add JPEG artifacts
-    final_image = add_jpeg_artifacts(noisy_image, jpeg_quality)
+    bgr_image = add_jpeg_artifacts(noisy_image, jpeg_quality)
+
+    # Add alpha channel
+    alpha_channel = np.ones(bgr_image.shape[:2], dtype=bgr_image.dtype) * 255 # creating a full alpha channel with value 255
+    final_image = cv2.merge([bgr_image, alpha_channel])  # add the alpha channel
 
     return final_image
 

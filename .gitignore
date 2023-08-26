@@ -1,3 +1,9 @@
+# Ignore images and weights
+*.jpg
+*.jpeg
+*.png
+*.pth
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
