@@ -105,6 +105,19 @@ def add_jpeg_artifacts(image, quality):
 
     return jpeg_image
 
+def random_color(saturation=30):
+    # Ensure saturation is in range [0, 255]
+    saturation = np.clip(saturation, 0, 255)
+
+    # Create a HSV color with random hue, specified saturation, and maximum brightness
+    hsv_color = np.uint8([[[np.random.randint(0, 180), saturation, 255]]])
+
+    # Convert the HSV color to BGR color
+    bgr_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2BGR)
+
+    # Return the first element of the 1x1 image which is the color
+    return bgr_color[0][0]
+
 
 if __name__ == "__main__":
     input_directory = "data"
@@ -118,7 +131,7 @@ if __name__ == "__main__":
     upscaled_image = upscale_nearest(input_image, scale_factor)
     canvas_scaled_image = increase_canvas(upscaled_image, (175, 175), 3)
 
-    red_filled_image = add_background(canvas_scaled_image, (0,0,255))  # Red color
+    red_filled_image = add_background(canvas_scaled_image, random_color())
     red_filled_image_bicubic = add_jpeg_artifacts(upscale_bicubic(red_filled_image, 2), 20)
     red_filled_image_noise = add_noise(red_filled_image_bicubic, 25)
     red_filled_image_noise_jpeg = add_noise(red_filled_image_noise, 40)
