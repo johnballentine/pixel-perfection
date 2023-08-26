@@ -119,6 +119,28 @@ def random_color(saturation=30):
     return bgr_color[0][0]
 
 
+def generate(image, scale_factor=2, max_random_offset=2, max_noise=40, jpeg_quality=40):
+    # Upscale the image using nearest neighbor interpolation
+    upscaled_image = upscale_nearest(image, scale_factor)
+
+    # Increase the canvas size with specified offset
+    canvas_scaled_image = increase_canvas(upscaled_image, (128, 128), max_random_offset)
+
+    # Fill transparency (if any) with a random color
+    color_filled_image = add_background(canvas_scaled_image, random_color())
+
+    # Upscale the color filled image using bicubic interpolation
+    color_filled_image_bicubic = upscale_bicubic(color_filled_image, scale_factor)
+
+    # Add some noise to the image
+    noisy_image = add_noise(color_filled_image_bicubic, max_noise)
+
+    # Add JPEG artifacts
+    final_image = add_jpeg_artifacts(noisy_image, jpeg_quality)
+
+    return final_image
+
+
 if __name__ == "__main__":
     input_directory = "data"
     files_in_directory = os.listdir(input_directory)
@@ -126,15 +148,9 @@ if __name__ == "__main__":
 
     # Specify the input image path
     input_image_path = os.path.join(input_directory, first_image)
-    scale_factor = 2
     input_image = cv2.imread(input_image_path, cv2.IMREAD_UNCHANGED)
-    upscaled_image = upscale_nearest(input_image, scale_factor)
-    canvas_scaled_image = increase_canvas(upscaled_image, (128, 128), 2)
-
-    red_filled_image = add_background(canvas_scaled_image, random_color())
-    red_filled_image_bicubic = upscale_bicubic(red_filled_image, scale_factor)
-    red_filled_image_noise = add_noise(red_filled_image_bicubic, 40)
-    red_filled_image_noise_jpeg = add_jpeg_artifacts(red_filled_image_noise, 40)
+    
+    output_image = generate(input_image)
 
     output_directory = "./output"
     output_filename = rewrite_filename_with_string(first_image, "canvas_scaled_red_filled")
@@ -143,4 +159,4 @@ if __name__ == "__main__":
     os.makedirs(output_directory, exist_ok=True)
 
     output_path = os.path.join(output_directory, output_filename)
-    cv2.imwrite(output_path, red_filled_image_noise_jpeg)
+    cv2.imwrite(output_path, output_image)
