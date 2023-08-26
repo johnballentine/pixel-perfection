@@ -2,81 +2,89 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
 from torchvision import transforms
 from PIL import Image
 import os
 import glob
 
-class PixelCNN(nn.Module):
-    def __init__(self, channels=128):
-        super(PixelCNN, self).__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(channels, 64, 3, padding=1, stride=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, stride=2),
-            nn.Conv2d(64, 128, 3, padding=1, stride=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, stride=2),
-            nn.Conv2d(128, 256, 3, padding=1, stride=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, stride=2)
-        )
+class NNDownscale(nn.Module):
+    def __init__(self, in_channels=4, out_channels=4):  # Set channels to 4, considering the alpha channel
+        super(NNDownscale, self).__init__()
         
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, 3, stride=2, padding=1, output_padding=1),
+        print("Initializing model.")  # Debug print
+        self.encoder = nn.Sequential(
+            nn.Conv2d(in_channels, 64, 3, padding=1, stride=2),  # Stride 2 for downscaling
             nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1),
+            nn.MaxPool2d(2),  # Further downscale
+            
+            nn.Conv2d(64, 128, 3, padding=1, stride=2),  # Stride 2 for downscaling
             nn.ReLU(),
-            nn.ConvTranspose2d(64, channels, 3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(),
-            nn.Conv2d(channels, channels, kernel_size=1)  # 1x1 convolution to keep dimensions consistent
+            nn.MaxPool2d(2),  # Further downscale
+            
+            nn.Conv2d(128, out_channels, 1)  # 1x1 Conv to adjust channel number
         )
+
+        print("Model initialized.")  # Debug print
 
     def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+        print("Running forward pass.")  # Debug print
+        return self.encoder(x)
 
 
-def train_model(directory, epochs):
+def train_model(directory, epochs, batch_size=16):
+    print(f"Training model from directory: {directory}")  # Debug print
     transform = transforms.ToTensor()
     label_files = sorted(glob.glob(os.path.join(directory, '*_label.png')))
     processed_files = sorted(glob.glob(os.path.join(directory, '*_processed.png')))
     
+    print("Loading training data.")  # Debug print
     labels = [transform(Image.open(f)) for f in label_files]
     processed = [transform(Image.open(f)) for f in processed_files]
 
     labels = torch.stack(labels)
     processed = torch.stack(processed)
+    
+    print("Creating DataLoader.")  # Debug print
+    dataset = TensorDataset(processed, labels)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    # Initialize model, loss, and optimizer
-    model = PixelCNN(processed.shape[1])
+    print("Initializing loss and optimizer.")  # Debug print
+    model = NNDownscale(in_channels=processed.shape[1], out_channels=labels.shape[1])
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
+    print("Training started.")  # Debug print
     for epoch in range(epochs):
-        optimizer.zero_grad()
-        outputs = model(processed)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-        print(f"Epoch {epoch+1}, Loss: {loss.item()}")
+        for batch_idx, (batch_processed, batch_labels) in enumerate(dataloader):
+            print(f"Processing batch {batch_idx+1}.")  # Debug print
+            optimizer.zero_grad()
+            outputs = model(batch_processed)
+            loss = criterion(outputs, batch_labels)
+            loss.backward()
+            optimizer.step()
 
+            print(f"Epoch: {epoch+1}/{epochs}, Batch: {batch_idx+1}/{len(dataloader)}, Loss: {loss.item()}")
+
+    print("Training complete.")  # Debug print
     torch.save(model.state_dict(), 'trained_model.pth')
     print("Model saved.")
 
 def use_inference(model_path, input_image_path, output_image_path):
-    # Dynamically determine the number of channels
+    print("Starting inference.")  # Debug print
     input_image = Image.open(input_image_path)
-    channels = len(input_image.getbands())  # This will return 3 for RGB and 4 for RGBA, for example
+    channels = len(input_image.getbands())
     
-    model = PixelCNN(channels)  # Initialize model with the correct number of channels
+    print(f"Input image has {channels} channels.")  # Debug print
+    model = NNDownscale(channels)
     model.load_state_dict(torch.load(model_path))
     model.eval()
     
+    print("Loading and transforming input image.")  # Debug print
     transform = transforms.ToTensor()
     input_tensor = transform(input_image).unsqueeze(0)
     
+    print("Running inference.")  # Debug print
     with torch.no_grad():
         output_tensor = model(input_tensor)
 
@@ -93,8 +101,8 @@ def use_inference(model_path, input_image_path, output_image_path):
 
     print(f"Output image saved at {unique_output_path}")
 
-
 def main(args):
+    print("Parsing arguments.")  # Debug print
     if args.train:
         train_model(args.directory, args.epochs)
     elif args.infer:
@@ -112,12 +120,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_path', type=str, default='model.pth', help='Path to the trained model')
     parser.add_argument('--input_image', type=str, default='', help='Path to the input image for inference')
     parser.add_argument('--output_image', type=str, default='', help='Path to save the output image')
-
+    
     args = parser.parse_args()
-
-    if args.train and not args.directory:
-        print("Error: Directory must be specified for training.")
-        exit(1)
-
+    print("Arguments parsed.")  # Debug print
     main(args)
-

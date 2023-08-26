@@ -18,9 +18,9 @@ def upscale_nearest(image, scale_factor):
 
     return rescaled_image
 
-def upscale_bicubic(image, scale_factor):
-    # Upscale the image using INTER_CUBIC interpolation
-    rescaled_image = cv2.resize(image, None, fx = scale_factor, fy = scale_factor, interpolation = cv2.INTER_CUBIC)
+def upscale_bicubic(image, target_size):
+    # Upscale the image to the target size using INTER_CUBIC interpolation
+    rescaled_image = cv2.resize(image, target_size, interpolation=cv2.INTER_CUBIC)
     return rescaled_image
 
 def upscale_bilinear(image, scale_factor):
@@ -120,34 +120,22 @@ def random_color(saturation=30):
 
 
 def generate(image,
-             image_size=(128,128),
+             image_size=(128, 128),
              scale_factor=2,
-             max_random_offset=2,
-             max_noise=40,
+             buffer_pixels=2,
              jpeg_quality=40):
-    # Upscale the image using nearest neighbor interpolation
-    upscaled_image = upscale_nearest(image, scale_factor)
-
-    # Increase the canvas size with specified offset
-    canvas_scaled_image = increase_canvas(upscaled_image, image_size, max_random_offset)
-
-    # Fill transparency (if any) with a random color
-    color_filled_image = add_background(canvas_scaled_image, random_color())
-
-    # Upscale the color filled image using bicubic interpolation
-    color_filled_image_bicubic = upscale_bicubic(color_filled_image, scale_factor)
-
-    # Add some noise to the image
-    noisy_image = add_noise(color_filled_image_bicubic, max_noise)
-
-    # Add JPEG artifacts
-    bgr_image = add_jpeg_artifacts(noisy_image, jpeg_quality)
+    
+    upscaled = upscale_nearest(image, scale_factor)
+    padded = increase_canvas(upscaled, (34, 34), 0)
+    bicubic_upscaled = upscale_bicubic(padded, (256,256))
+    bicubic_background = add_background(bicubic_upscaled, random_color())
+    bicubic_jpeg = add_jpeg_artifacts(bicubic_background, jpeg_quality)
 
     # Add alpha channel
-    alpha_channel = np.ones(bgr_image.shape[:2], dtype=bgr_image.dtype) * 255 # creating a full alpha channel with value 255
-    final_image = cv2.merge([bgr_image, alpha_channel])  # add the alpha channel
+    alpha_channel = np.ones(bicubic_jpeg.shape[:2], dtype=bicubic_jpeg.dtype) * 255
+    final_image_with_alpha = cv2.merge([bicubic_jpeg, alpha_channel])
 
-    return final_image
+    return final_image_with_alpha
 
 
 if __name__ == "__main__":
@@ -167,13 +155,11 @@ if __name__ == "__main__":
 
             # Read the input image
             input_image = cv2.imread(input_image_path, cv2.IMREAD_UNCHANGED)
-
-            # Increase the canvas size of the original image with 0 offset
-            input_image_canvas = increase_canvas(input_image, image_size, 0)
+            #input_image_upscaled = upscale_nearest(input_image, 16)
 
             # Write the original image with increased canvas size to the output directory with filename modified to include "_label"
             label_filename = rewrite_filename_with_string(filename, "label")
-            cv2.imwrite(os.path.join(output_directory, label_filename), input_image_canvas)
+            cv2.imwrite(os.path.join(output_directory, label_filename), input_image)
 
             # Process the input image
             output_image = generate(input_image)
