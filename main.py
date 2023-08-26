@@ -71,6 +71,41 @@ def add_background(image, bgcolor):
     # Merge channels into final image but only keep BGR channels
     return cv2.merge([blend_B, blend_G, blend_R])
 
+
+def add_noise(image, max_amount):
+
+    ''' max_amount is between 0 and 100 percent '''
+
+    # Normalize max_amount to range from 0 to 0.1
+    max_amount /= 4000
+
+    # Normalize the image to [0, 1]
+    image_normalized = image / 255.0
+
+    # Generate a noise matrix with mean 0 and standard deviation of max_amount
+    noise = np.random.normal(0, max_amount, image_normalized.shape)
+
+    # Add the noise to the image
+    noisy_image = image_normalized + noise
+
+    # Clip the pixel values to be between 0 and 1
+    noisy_image_clipped = np.clip(noisy_image, 0, 1)
+
+    # Denormalize the image to original scale
+    noisy_image_denormalized = (noisy_image_clipped * 255).astype(np.uint8)
+
+    return noisy_image_denormalized
+
+def add_jpeg_artifacts(image, quality):
+    # Encode the image as JPEG with specified quality level
+    retval, buffer = cv2.imencode('.jpg', image, [int(cv2.IMWRITE_JPEG_QUALITY), quality]) 
+
+    # Decode back into an OpenCV image
+    jpeg_image = cv2.imdecode(buffer, cv2.IMREAD_UNCHANGED)
+
+    return jpeg_image
+
+
 if __name__ == "__main__":
     input_directory = "data"
     files_in_directory = os.listdir(input_directory)
@@ -84,7 +119,7 @@ if __name__ == "__main__":
     canvas_scaled_image = increase_canvas(upscaled_image, (129, 129), 5)
 
     red_filled_image = add_background(canvas_scaled_image, (0,0,255))  # Red color
-    red_filled_image_bicubic = upscale_bicubic(red_filled_image, 2)
+    red_filled_image_bicubic = add_jpeg_artifacts(upscale_bicubic(red_filled_image, 2), 20)
 
     output_directory = "./output"
     output_filename = rewrite_filename_with_string(first_image, "canvas_scaled_red_filled")
