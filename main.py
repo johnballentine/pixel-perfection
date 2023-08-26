@@ -12,10 +12,20 @@ def rewrite_filename_with_string(filename, extra_string):
 
     return new_filename
 
-def upscale_integer(image, scale_factor):
+def upscale_nearest(image, scale_factor):
     # Upscale the image using INTER_NEAREST interpolation
     rescaled_image = cv2.resize(image, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_NEAREST)
 
+    return rescaled_image
+
+def upscale_bicubic(image, scale_factor):
+    # Upscale the image using INTER_CUBIC interpolation
+    rescaled_image = cv2.resize(image, None, fx = scale_factor, fy = scale_factor, interpolation = cv2.INTER_CUBIC)
+    return rescaled_image
+
+def upscale_bilinear(image, scale_factor):
+    # Upscale the image using INTER_LINEAR interpolation
+    rescaled_image = cv2.resize(image, None, fx = scale_factor, fy = scale_factor, interpolation = cv2.INTER_LINEAR)
     return rescaled_image
 
 def increase_canvas(image, new_dimensions, max_random_offset=0):
@@ -70,11 +80,11 @@ if __name__ == "__main__":
     input_image_path = os.path.join(input_directory, first_image)
     scale_factor = 2
     input_image = cv2.imread(input_image_path, cv2.IMREAD_UNCHANGED)
-    upscaled_image = upscale_integer(input_image, scale_factor)
+    upscaled_image = upscale_nearest(input_image, scale_factor)
     canvas_scaled_image = increase_canvas(upscaled_image, (129, 129), 5)
-    #print("canvas_scaled_image shape:", canvas_scaled_image.shape)
 
     red_filled_image = add_background(canvas_scaled_image, (0,0,255))  # Red color
+    red_filled_image_bicubic = upscale_bicubic(red_filled_image, 2)
 
     output_directory = "./output"
     output_filename = rewrite_filename_with_string(first_image, "canvas_scaled_red_filled")
@@ -83,4 +93,4 @@ if __name__ == "__main__":
     os.makedirs(output_directory, exist_ok=True)
 
     output_path = os.path.join(output_directory, output_filename)
-    cv2.imwrite(output_path, red_filled_image)
+    cv2.imwrite(output_path, red_filled_image_bicubic)
