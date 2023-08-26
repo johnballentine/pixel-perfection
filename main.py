@@ -26,13 +26,19 @@ def increase_canvas(image, new_dimensions):
 
     return enlarged_image
 
-def fill_transparency(image, color):
+def add_background(image, bgcolor):
+    ''' Overlays an image with a transparent background on top of a background color.
+        "image" is an OpenCV image with a transparency alpha channel
+        "bgcolor" is a BGR color
+        
+        returns a BGR OpenCV image with no alpha channel'''
+
     # Split the image into BGRA channels
     B,G,R,A = cv2.split(image)
 
     # Create a 3-channel color image (RGB)
     fill_color_img = np.zeros([image.shape[0], image.shape[1], 3]).astype('uint8')
-    fill_color_img[:,:] = color
+    fill_color_img[:,:] = bgcolor
   
     # Calculate the weighting of each pixel based on transparency
     A = A / 255.0
@@ -61,7 +67,7 @@ if __name__ == "__main__":
     canvas_scaled_image = increase_canvas(upscaled_image, (129, 129))
     #print("canvas_scaled_image shape:", canvas_scaled_image.shape)
 
-    red_filled_image = fill_transparency(canvas_scaled_image, (0,0,255))  # Red color
+    red_filled_image = add_background(canvas_scaled_image, (0,0,255))  # Red color
 
     output_directory = "./output"
     output_filename = rewrite_filename_with_string(first_image, "canvas_scaled_red_filled")
