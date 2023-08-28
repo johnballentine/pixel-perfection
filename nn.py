@@ -2,6 +2,7 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.init as init
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader, TensorDataset
@@ -13,44 +14,33 @@ import glob
 class NNDownscale(nn.Module):
     def __init__(self):
         super(NNDownscale, self).__init__()
-
-        self.conv1 = nn.Conv2d(4, 64, 3, padding=1)
-        self.bn1 = nn.BatchNorm2d(64)
         
-        self.conv2 = nn.Conv2d(64, 128, 3, padding=1)
-        self.bn2 = nn.BatchNorm2d(128)
+        # Input shape: [batch, 4, 256, 256] (RGBA channels)
+        self.encoder = nn.Sequential(
+            nn.Conv2d(4, 64, kernel_size=3, stride=1, padding=1),  # Output shape: [batch, 64, 256, 256]
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # Output shape: [batch, 64, 128, 128]
+            
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),  # Output shape: [batch, 128, 128, 128]
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # Output shape: [batch, 128, 64, 64]
+            
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),  # Output shape: [batch, 256, 64, 64]
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # Output shape: [batch, 256, 32, 32]
+            
+            nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),  # Output shape: [batch, 512, 32, 32]
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # Output shape: [batch, 512, 16, 16]
+            
+            nn.Conv2d(512, 4, kernel_size=1, stride=1, padding=0),  # Output shape: [batch, 4, 16, 16] (RGBA channels)
+            nn.Sigmoid()
+        )
         
-        self.conv3 = nn.Conv2d(128, 256, 3, padding=1)
-        self.bn3 = nn.BatchNorm2d(256)
-        
-        self.conv4 = nn.Conv2d(256, 512, 3, padding=1)
-        self.bn4 = nn.BatchNorm2d(512)
-        
-        self.conv5 = nn.Conv2d(512, 1024, 3, padding=1)
-        self.bn5 = nn.BatchNorm2d(1024)
-        
-        self.conv6 = nn.Conv2d(1024, 1024, 3, padding=1)
-        self.bn6 = nn.BatchNorm2d(1024)
-        
-        self.final_conv = nn.Conv2d(1024, 4, 1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((16,16))
-
     def forward(self, x):
-        x = self.pool(F.relu(self.bn1(self.conv1(x))))
-        x = self.pool(F.relu(self.bn2(self.conv2(x))))
-        x = self.pool(F.relu(self.bn3(self.conv3(x))))
-        x = self.pool(F.relu(self.bn4(self.conv4(x))))
-        x = self.pool(F.relu(self.bn5(self.conv5(x))))
-        x = self.pool(F.relu(self.bn6(self.conv6(x))))
-        
-        x = self.final_conv(x)
-        x = self.adaptive_pool(x)
-        x = F.relu(x)
-
+        x = self.encoder(x)
         return x
-
-
+    
 
 def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
     print(f"Training model from directory: {directory}")  # Debug print
@@ -72,7 +62,7 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
     print("Initializing loss and optimizer.")  # Debug print
     model = NNDownscale()  # No arguments needed
     criterion = nn.SmoothL1Loss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4, betas=(0.9, 0.999))  # Changed beta1 to 0.9, which is recommended
+    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4, betas=(0.9, 0.999))
     scheduler = ReduceLROnPlateau(optimizer, 'min', patience=10)
 
     print("Training started.")  # Debug print
@@ -84,12 +74,6 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
             optimizer.zero_grad()
             outputs = model(batch_processed)
 
-            # Debug code to check unique alpha values
-            if epoch % 3 == 0 and batch_idx == 0:  # Print this every 3 epochs for the first batch
-                alpha_values = outputs[:, 3, :, :].unique()  # Assuming alpha is the 4th channel
-                print(f"Unique alpha values in this batch: {alpha_values}")
-            print(f"Max output value: {torch.max(outputs)}, Min output value: {torch.min(outputs)}")
-
             loss = criterion(outputs, batch_labels)
             epoch_loss += loss.item()  # Accumulate batch loss into epoch loss
             loss.backward()
@@ -98,12 +82,31 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
             optimizer.step()
-            print(f"Epoch: {epoch+1}/{epochs}, Batch: {batch_idx+1}/{len(dataloader)}, Loss: {loss.item()}")
+            print(f"Epoch: {epoch+1}/{epochs}, Batch: {batch_idx+1}/{len(dataloader)}")
+
+            # Print the mean, median, min, and max for all channels
+            all_channel_values = outputs.view(-1)  # Reshape tensor to combine all channel values
+
+            mean_value = torch.mean(all_channel_values)
+            median_value = torch.median(all_channel_values)
+            min_value = torch.min(all_channel_values)
+            max_value = torch.max(all_channel_values)
+
+            print()
+            print(f"Stat values:")
+            print(f"  Mean: {mean_value}")
+            print(f"  Median: {median_value}")
+            print(f"  Min: {min_value}")
+            print(f"  Max: {max_value}")
+            print()
+            print(f"Loss: {loss.item()}")
+            print("----")
 
         avg_epoch_loss = epoch_loss / len(dataloader)  # Calculate average epoch loss
         scheduler.step(avg_epoch_loss)  # Step the scheduler based on the average epoch loss
 
         print(f"Average loss for Epoch {epoch+1}: {avg_epoch_loss}")
+        print()
 
         # Save the model to temp after epoch to enable early stopping with lower risk of corruption
         torch.save(model.state_dict(), temp_model_save_path)
@@ -128,6 +131,7 @@ def use_inference(model_path, input_image_path, output_image_path):
     print("Running inference.")  # Debug print
     with torch.no_grad():
         output_tensor = model(input_tensor)
+        print(f"Output tensor shape: {output_tensor.shape}")
 
     # Generate unique filename
     counter = 0
@@ -138,7 +142,7 @@ def use_inference(model_path, input_image_path, output_image_path):
         unique_output_path = f"{filename}_{counter}{file_extension}"
 
     # Rescale to 0-255 and convert to byte tensor
-    output_tensor = ((output_tensor.squeeze() + 1) * 127.5).byte()
+    output_tensor = (output_tensor.squeeze() * 255).byte()
 
     # Convert to PIL Image
     output_image = Image.fromarray(output_tensor.permute(1, 2, 0).numpy(), 'RGBA')
