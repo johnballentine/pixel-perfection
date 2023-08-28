@@ -92,8 +92,10 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
     optimizer = optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4, betas=(0.9, 0.999))
     scheduler = ReduceLROnPlateau(optimizer, 'min', patience=10)
 
-    print("Training started.")  # Debug print
-    temp_model_save_path = f"{model_save_path}_temp.pth"  # Temporary model file path
+    print("----")
+    print("\033[92mTraining started.\033[0m")
+    print("----")
+    temp_model_save_path = f"{model_save_path}_temp.pth"
     for epoch in range(epochs):
         epoch_loss = 0.0  # Initialize epoch_loss to accumulate loss over the epoch
 
@@ -120,10 +122,10 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
             max_value = torch.max(all_channel_values)
 
             print()
-            print(f"  \033[92mMean:\033[0m {mean_value}")
+            print(f"    \033[92mMean:\033[0m {mean_value}")
             print(f"  \033[92mMedian:\033[0m {median_value}")
-            print(f"  \033[92mMin:\033[0m {min_value}")
-            print(f"  \033[92mMax:\033[0m {max_value}")
+            print(f"     \033[92mMin:\033[0m {min_value}")
+            print(f"     \033[92mMax:\033[0m {max_value}")
             print()
             print(f"\033[93mLoss:\033[0m {loss.item()}")
             print("----")
