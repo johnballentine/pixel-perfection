@@ -132,10 +132,10 @@ def generate(image,
     bicubic_jpeg = add_jpeg_artifacts(bicubic_background, jpeg_quality)
 
     # Add alpha channel
-    alpha_channel = np.ones(bicubic_jpeg.shape[:2], dtype=bicubic_jpeg.dtype) * 255
-    final_image_with_alpha = cv2.merge([bicubic_jpeg, alpha_channel])
+    #alpha_channel = np.ones(bicubic_jpeg.shape[:2], dtype=bicubic_jpeg.dtype) * 255
+    #final_image_with_alpha = cv2.merge([bicubic_jpeg, alpha_channel])
 
-    return final_image_with_alpha
+    return bicubic_jpeg
 
 
 if __name__ == "__main__":

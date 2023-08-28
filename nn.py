@@ -7,7 +7,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import transforms
-from PIL import Image
+from PIL import Image, ImageOps
 import os
 import glob
 import shutil
@@ -124,6 +124,17 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
 def use_inference(model_path, input_image_path, output_image_path):
     print("Starting inference.")  # Debug print
     input_image = Image.open(input_image_path)
+
+    # Check if the image is 256x256
+    if input_image.size != (256, 256):
+        print("Error: The input image must be 256x256.")
+        return
+    
+     # Check if the image has an alpha channel
+    if 'A' not in input_image.getbands():
+        print("Adding alpha channel.")
+        input_image = ImageOps.exif_transpose(input_image.convert("RGBA"))
+
     print(f"Input image dimensions: {input_image.size}")  # Debug print
     channels = len(input_image.getbands())
     
