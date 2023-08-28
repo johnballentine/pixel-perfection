@@ -44,15 +44,41 @@ class NNDownscale(nn.Module):
     
 
 def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
-    print(f"Training model from directory: {directory}")  # Debug print
+    print(f"Training model from directory: \033[36m{directory}\033[0m")  # Debug print
     transform = transforms.ToTensor()
     label_files = sorted(glob.glob(os.path.join(directory, '*_label.png')))
     processed_files = sorted(glob.glob(os.path.join(directory, '*_processed.png')))
     
-    print("Loading training data.")  # Debug print
-    labels = [transform(Image.open(f)) for f in label_files]
-    processed = [transform(Image.open(f)) for f in processed_files]
+    print("Loading training data and performing checks.")  # Debug print
+    
+    # Initialize lists to hold label and processed data
+    labels = []
+    processed = []
+    
+    # Check properties for label images
+    for f in label_files:
+        img = Image.open(f)
+        if img.size != (16, 16):
+            print(f"\033[91mError:\033[0m The label image {f} must be 16x16.")
+            return
+        if 'A' not in img.getbands():
+            print(f"\033[91mError:\033[0m The label image {f} must have an alpha channel.")
+            return
+        labels.append(transform(img))
+    
+    # Check properties for processed images
+    for f in processed_files:
+        img = Image.open(f)
+        if img.size != (256, 256):
+            print(f"\033[91Error:\033[0m The input image {f} must be 256x256.")
+            return
+        if 'A' not in img.getbands():
+            # Check if there's an alpha channel. If not, add one with all values 255.
+            # 4 channels are expected for training.
+            img = ImageOps.exif_transpose(img.convert("RGBA"))
+        processed.append(transform(img))
 
+    # Convert lists to torch tensors
     labels = torch.stack(labels)
     processed = torch.stack(processed)
     
@@ -63,7 +89,7 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
     print("Initializing loss and optimizer.")  # Debug print
     model = NNDownscale()  # No arguments needed
     criterion = nn.SmoothL1Loss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4, betas=(0.9, 0.999))
+    optimizer = optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4, betas=(0.9, 0.999))
     scheduler = ReduceLROnPlateau(optimizer, 'min', patience=10)
 
     print("Training started.")  # Debug print
@@ -83,7 +109,7 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
             optimizer.step()
-            print(f"Epoch: {epoch+1}/{epochs}, Batch: {batch_idx+1}/{len(dataloader)}")
+            print(f"\033[34mEpoch:\033[0m {epoch+1}/{epochs}, \033[34mBatch:\033[0m {batch_idx+1}/{len(dataloader)}")
 
             # Print the mean, median, min, and max for all channels
             all_channel_values = outputs.view(-1)  # Reshape tensor to combine all channel values
@@ -94,13 +120,12 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
             max_value = torch.max(all_channel_values)
 
             print()
-            print(f"Stat values:")
-            print(f"  Mean: {mean_value}")
-            print(f"  Median: {median_value}")
-            print(f"  Min: {min_value}")
-            print(f"  Max: {max_value}")
+            print(f"  \033[92mMean:\033[0m {mean_value}")
+            print(f"  \033[92mMedian:\033[0m {median_value}")
+            print(f"  \033[92mMin:\033[0m {min_value}")
+            print(f"  \033[92mMax:\033[0m {max_value}")
             print()
-            print(f"Loss: {loss.item()}")
+            print(f"\033[93mLoss:\033[0m {loss.item()}")
             print("----")
 
         avg_epoch_loss = epoch_loss / len(dataloader)  # Calculate average epoch loss
@@ -194,7 +219,6 @@ if __name__ == "__main__":
     parser.add_argument('--output_image', type=str, default='', help='Path to save the output image')
     
     args = parser.parse_args()
-    print("Arguments parsed.")  # Debug print
 
     if args.train:
         train_model(args.directory, args.epochs, args.model_path)
