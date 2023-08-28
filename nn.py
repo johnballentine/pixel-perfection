@@ -10,6 +10,7 @@ from torchvision import transforms
 from PIL import Image
 import os
 import glob
+import shutil
 
 class NNDownscale(nn.Module):
     def __init__(self):
@@ -112,6 +113,13 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
         torch.save(model.state_dict(), temp_model_save_path)
         os.rename(temp_model_save_path, model_save_path)
         print(f"Model copied to {model_save_path}")
+
+        # Copy the model file at every 10th epoch with a special name
+        if (epoch + 1) % 10 == 0:
+            filename_without_extension, _ = os.path.splitext(model_save_path)
+            special_model_save_path = f"{filename_without_extension}_epoch{epoch+1}.pth"
+            shutil.copy(model_save_path, special_model_save_path)
+            print(f"Model copied to {special_model_save_path} for checkpointing.")
 
 def use_inference(model_path, input_image_path, output_image_path):
     print("Starting inference.")  # Debug print
