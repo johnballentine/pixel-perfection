@@ -82,12 +82,13 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
     labels = torch.stack(labels)
     processed = torch.stack(processed)
     
-    print("Creating DataLoader.")  # Debug print
+    print("Creating DataLoader.")
     dataset = TensorDataset(processed, labels)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    print("Initializing loss and optimizer.")  # Debug print
-    model = NNDownscale()  # No arguments needed
+    print("Initializing loss and optimizer.")
+    device = torch.device("cuda:0")
+    model = NNDownscale().to(device)
     criterion = nn.SmoothL1Loss()
     optimizer = optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4, betas=(0.9, 0.999))
     scheduler = ReduceLROnPlateau(optimizer, 'min', patience=10)
@@ -100,6 +101,10 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
         epoch_loss = 0.0  # Initialize epoch_loss to accumulate loss over the epoch
 
         for batch_idx, (batch_processed, batch_labels) in enumerate(dataloader):
+
+            # Move the batch tensors to the same device as the model
+            batch_processed, batch_labels = batch_processed.to(device), batch_labels.to(device)
+
             optimizer.zero_grad()
             outputs = model(batch_processed)
 
@@ -173,6 +178,9 @@ def use_inference(model_path, input_image_path, output_image_path):
     print("Loading and transforming input image.")  # Debug print
     transform = transforms.ToTensor()
     input_tensor = transform(input_image).unsqueeze(0)
+
+    print(next(model.parameters()).device)
+    print(input_tensor.device)
     
     print("Running inference.")  # Debug print
     with torch.no_grad():
@@ -228,3 +236,4 @@ if __name__ == "__main__":
         use_inference(args.model_path, args.input_image, args.output_image)
     else:
         print("Invalid choice. Exiting.")
+
