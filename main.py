@@ -127,7 +127,7 @@ def generate(image,
     
     upscaled = upscale_nearest(image, scale_factor)
     padded = increase_canvas(upscaled, (34, 34), 0)
-    bicubic_upscaled = upscale_bicubic(padded, (256,256))
+    bicubic_upscaled = upscale_bicubic(padded, (512,512))
     bicubic_background = add_background(bicubic_upscaled, random_color())
     bicubic_jpeg = add_jpeg_artifacts(bicubic_background, jpeg_quality)
 
