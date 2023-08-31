@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 import argparse
@@ -34,12 +35,17 @@ def add_background(image, bgcolor):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Add a background color to a transparent image.')
-    parser.add_argument('--input_image', type=str, help='Path to the input image with alpha channel.')
+    parser.add_argument('input_image', type=str, help='Path to the input image with alpha channel.')
     parser.add_argument('--output_image', type=str, help='Path to save the output image.')
     parser.add_argument('--bgcolor', nargs=3, type=int, default=[255, 255, 255], help='Background color in BGR format.')
     parser.add_argument('--scale', type=float, default=4.0, help='Scaling factor for upscaling the image.')
 
     args = parser.parse_args()
+
+    # Determine the output filename if not specified
+    if args.output_image is None:
+        base_name, ext = os.path.splitext(args.input_image)
+        args.output_image = f"{base_name}_bg{ext}"
 
     # Read the input image
     input_image = cv2.imread(args.input_image, cv2.IMREAD_UNCHANGED)

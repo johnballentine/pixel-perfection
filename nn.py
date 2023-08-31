@@ -12,6 +12,33 @@ import os
 import glob
 import shutil
 
+class PixelLoss(nn.Module):
+    # Penalizes intermediate transparency values that are neither 0 nor 1
+    def __init__(self):
+        super(PixelLoss, self).__init__()
+        self.mse = nn.MSELoss()
+
+    def forward(self, pred, target):
+        # Basic MSE loss
+        base_loss = self.mse(pred, target)
+
+        # Extract the alpha channel from the predictions
+        pred_alpha = pred[:, 3, :, :]
+
+        # Create a mask for alpha values that are neither 0 nor 1
+        mask = (pred_alpha > 0) & (pred_alpha < 1)
+
+        # Calculate the penalty term
+        alpha_penalty = torch.sum(mask.float())
+
+        # Hyperparameter to tune penalty for intermediate transparency values
+        penalty_weight = 0.25
+
+        # Combine the base loss and the penalty
+        total_loss = base_loss + penalty_weight * alpha_penalty
+
+        return total_loss
+
 class NNDownscale(nn.Module):
     def __init__(self):
         super(NNDownscale, self).__init__()
@@ -89,7 +116,7 @@ def train_model(directory, epochs, model_save_path="model.pth", batch_size=16):
     print("Initializing loss and optimizer.")
     device = torch.device("cuda:0")
     model = NNDownscale().to(device)
-    criterion = nn.SmoothL1Loss()
+    criterion = PixelLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4, betas=(0.9, 0.999))
     scheduler = ReduceLROnPlateau(optimizer, 'min', patience=10)
 
