@@ -75,7 +75,7 @@ def add_background(image, bgcolor, angle=2):
     
     # First, rotate the image if angle is not 0
     if angle != 0:
-        image = rotate_image(image, generate_skewed_random(min_val=(angle * -1), max_val=angle))
+        image = rotate_image(image, generate_skewed_random(min_val=-angle, max_val=angle))
     
     # Split the image into BGRA channels
     B, G, R, A = cv2.split(image)
@@ -167,19 +167,17 @@ def add_alpha_channel_if_missing(image):
     return image
 
 def generate_skewed_random(min_val: int, max_val: int) -> int:
-    # Skews a random number towards the max or the min
-
-    # Generate a random number between 0 and 1
-    random_val = random.random()
+    rand_val = random.random()
+    mid_val = (min_val + max_val) / 2.0
     
-    # Apply the piecewise function
-    if random_val < 0.5:
-        transformed_val = random_val ** 2 / 2
+    # Piecewise linear function
+    if rand_val < 0.5:
+        # Linearly interpolate between min_val and mid_val
+        return int(min_val + 2 * rand_val * (mid_val - min_val))
     else:
-        transformed_val = 1 - ((1 - random_val) ** 2) / 2
+        # Linearly interpolate between mid_val and max_val
+        return int(mid_val + 2 * (rand_val - 0.5) * (max_val - mid_val))
 
-    # Map to the desired range
-    return int(min_val + (max_val - min_val) * transformed_val)
 
 def alter_vividness(image: np.ndarray, vividness: int = 10) -> np.ndarray:
     if len(image.shape) != 3 or image.shape[2] != 4:
@@ -208,26 +206,33 @@ def alter_vividness(image: np.ndarray, vividness: int = 10) -> np.ndarray:
 
     return output_image
 
-def warp(image: np.ndarray, frequency: float = 1.0, amplitude: float = 2.0) -> np.ndarray:
+def warp(image: np.ndarray, frequency: float = 2.0, amplitude: float = 1.5, phase_shift_range: float = 0.3) -> np.ndarray:
     # Get the shape of the image
     rows, cols, _ = image.shape
 
     # Generate x and y coordinates
     x_indices, y_indices = np.indices((rows, cols))
 
-    # Apply the ripple by modifying the y-coordinates based on a sinusoidal function of the x-coordinates
-    y_indices_mod = y_indices + amplitude * np.sin(2 * np.pi * frequency * x_indices / cols)
+    # Generate a random phase shift within the specified range
+    phase_shift = generate_skewed_random(-phase_shift_range, phase_shift_range)
+
+    # Apply the ripple by modifying the x-coordinates based on a sinusoidal function of the y-coordinates
+    x_indices_mod = x_indices + amplitude * np.sin(2 * np.pi * frequency * (y_indices / rows + phase_shift))
 
     # Make sure we don't exceed the boundary of the image
-    y_indices_mod = np.clip(y_indices_mod, 0, rows-1).astype(np.float32)
+    x_indices_mod = np.clip(x_indices_mod, 0, cols-1).astype(np.float32)
 
     # Prepare the final map
-    map_y, map_x = np.broadcast_arrays(y_indices_mod, x_indices.astype(np.float32))
+    map_y, map_x = np.broadcast_arrays(y_indices.astype(np.float32), x_indices_mod)
 
     # Remap the image
-    output_image = cv2.remap(image, map_y, map_x, interpolation=cv2.INTER_LINEAR)
+    output_image = cv2.remap(image, map_x, map_y, interpolation=cv2.INTER_LINEAR)
+    
+    # Rotate the image by +90 degrees clockwise
+    rotated_image = cv2.rotate(output_image, cv2.ROTATE_90_CLOCKWISE)
 
-    return output_image
+    return rotated_image
+
 
 def generate(image,
              image_size=(128, 128),
@@ -236,7 +241,7 @@ def generate(image,
              jpeg_quality=20):
     
     upscaled = upscale_nearest(image, scale_factor)
-    padded = increase_canvas(upscaled, (34, 34), 7)
+    padded = increase_canvas(upscaled, (34, 34), 2)
     bicubic_upscaled = upscale_bicubic(padded, (256,256))
     bicubic_blur = gaussian_blur(bicubic_upscaled)
     bicubic_vividness = alter_vividness(bicubic_blur)
