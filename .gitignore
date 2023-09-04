@@ -4,6 +4,11 @@
 *.png
 *.pth
 
+# Don't ignore images in the output images folder
+!output/*.png
+!output/*.jpeg
+!output/*.jpg
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
